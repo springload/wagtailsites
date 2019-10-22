@@ -1,0 +1,18 @@
+.alert {
+    display: inline-block;
+    padding: 1.3rem;
+    margin-bottom: 1rem;
+
+    &.alert--info {
+        background: #fff6c0;
+    }
+
+    &.alert--error {
+        background: #ffc0c0;
+    }
+
+    .alert__messages {
+        margin-bottom: 0;
+    }
+}
+

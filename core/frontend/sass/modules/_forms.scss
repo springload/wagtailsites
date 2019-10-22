@@ -15,6 +15,7 @@ $input-label-color:              $color-base-font-muted;
     input[type='search'],
     input[type='email'],
     input[type='url'],
+    input[type='password'],
     textarea {
         padding: .5em .75em;
         border-radius: $input-border-radius;
@@ -25,7 +26,8 @@ $input-label-color:              $color-base-font-muted;
 .form-add-page {
     max-width: 30em;
 
-    input, textarea {
+    input:not([type="checkbox"]),
+    textarea {
         width: 100%;
     }
 
@@ -34,6 +36,12 @@ $input-label-color:              $color-base-font-muted;
         display: inline-block;
         vertical-align: top;
         margin-bottom: .5rem;
+    }
+
+    .ctrl-holder {
+        input {
+            width: auto;
+        }
     }
 }
 

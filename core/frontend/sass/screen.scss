@@ -203,6 +203,9 @@ $outer-margin-small: 5%;
 // Sass includes
 // ----------------------------------------------------------------------------
 
+@import 'modules/social-buttons';
+@import 'modules/labels';
+@import 'modules/alerts';
 @import 'modules/icons';
 @import 'modules/buttons';
 @import 'modules/tags';

@@ -95,6 +95,10 @@ INSTALLED_APPS = (
     'wagtail.wagtailsearch',
     'wagtail.wagtailredirects',
     'wagtail.wagtailforms',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -109,6 +113,14 @@ MIDDLEWARE_CLASSES = (
 
     'wagtail.wagtailredirects.middleware.RedirectMiddleware',
 )
+
+AUTHENTICATION_BACKENDS = (
+    # Needed to login by username in Django admin, regardless of `allauth`
+    'django.contrib.auth.backends.ModelBackend',
+    # `allauth` specific authentication methods, such as login by e-mail
+    'allauth.account.auth_backends.AuthenticationBackend',
+)
+
 SITE_ID = 1
 
 # Name and email addresses of recipients
@@ -190,7 +202,7 @@ CONTEXT_PROCESSORS = [
 
 # Wagtail settings
 
-LOGIN_URL = 'wagtailadmin_login'
+WAGTAIL_FRONTEND_LOGIN_URL = LOGIN_URL = 'account_login'
 LOGIN_REDIRECT_URL = 'wagtailadmin_home'
 
 # Wagtailgmaps settings
@@ -218,3 +230,8 @@ WAGTAILSEARCH_BACKENDS = {
         'INDEX': SITE_NAME,
     },
 }
+
+# allauth configuration
+ACCOUNT_EMAIL_REQUIRED = True  # we want to send page published confirmation email to the user
+ACCOUNT_AUTHENTICATED_LOGIN_REDIRECTS = False  # prevent redirect loop in case user log in without permissions
+ACCOUNT_SIGNUP_FORM_CLASS = 'contrib.allauth.account.form.BaseSignUpForm'

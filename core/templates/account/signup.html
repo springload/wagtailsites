@@ -1,0 +1,38 @@
+{% extends "account/base.html" %}
+
+{% load i18n %}
+{% load account socialaccount %}
+
+{% block title %}{% trans "Signup" %}{% endblock %}
+
+{% block content %}
+<div class="site-content content-width">
+    {% include "partials/messages.html" %}
+    <div class="banner">
+        <h1>{% trans "Sign Up" %}</h1>
+        <div class="intro">
+            <p>{% blocktrans %}Already have an account? Then please <a href="{{ login_url }}">sign in</a>.{% endblocktrans %}</p>
+            {% get_providers as socialaccount_providers %}
+            {% if socialaccount_providers %}
+                <p>{% blocktrans with site.name as site_name %}Please sign up with one
+                of your existing third party accounts.{% endblocktrans %}</p>
+                <div class="socialaccount-ballot">
+                    <ul class="socialaccount-providers">
+                        {% include "socialaccount/snippets/provider_list.html" with process="login" %}
+                    </ul>
+                    <div class="signup-or">{% trans 'or' %}</div>
+                </div>
+                {% include "socialaccount/snippets/login_extra.html" %}
+            {% endif %}
+        </div>
+    </div>
+    <form class="form form-add-page" id="signup_form" method="post" action="{% url 'account_signup' %}">
+      {% csrf_token %}
+      {{ form.as_p }}
+      {% if redirect_field_value %}
+      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+      {% endif %}
+      <button class="btn" type="submit">{% trans "Sign Up" %} &raquo;</button>
+    </form>
+</div>
+{% endblock %}

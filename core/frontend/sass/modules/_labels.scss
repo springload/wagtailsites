@@ -1,0 +1,16 @@
+.label {
+    color: #fff;
+    padding: 1px 10px;
+
+    &--verified {
+        background: #00e240
+    }
+
+    &--unverified {
+        background: #e23500
+    }
+
+    &--primary {
+        background: #4285F4
+    }
+}

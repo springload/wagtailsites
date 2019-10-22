@@ -4,7 +4,7 @@ from django.conf import settings
 from django.conf.urls import include, url
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView, TemplateView
 from wagtail.contrib.wagtailsitemaps.views import sitemap
 from wagtail.wagtailadmin import urls as wagtailadmin_urls
 from wagtail.wagtailcore import urls as wagtail_urls
@@ -21,7 +21,12 @@ admin.autodiscover()
 wagtailsearch_register_signal_handlers()
 
 urlpatterns = [
+    url(r'^accounts/', include('allauth.urls')),
+    # redirect django admin login to allauth login
+    url(r'^django-admin/login/$', RedirectView.as_view(pattern_name=settings.LOGIN_URL, query_string=True)),
     url(r'^django-admin/', include(admin.site.urls)),
+    # redirect wagtail admin login to allauth login
+    url(r'^admin/login/$', RedirectView.as_view(pattern_name=settings.LOGIN_URL, query_string=True)),
     url(r'^admin/', include(wagtailadmin_urls)),
     url(r'^search/', include(wagtailsearch_urls)),
     url(r'^documents/', include(wagtaildocs_urls)),

@@ -1,0 +1,30 @@
+.socialaccount-ballot ul.socialaccount-providers{
+    padding: 0;
+}
+
+.socialaccount-ballot ul.socialaccount-providers li {
+    list-style: none;
+}
+
+a.socialaccount-provider {
+    background: #fff;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    width: 190px;
+}
+
+.socialaccount-provider .socialaccount-provider__icon {
+    width: rem(40);
+    height: rem(40);
+    margin: 2px 7px 2px 2px;
+}
+
+a.socialaccount-provider:hover {
+    background: #4285F4;
+    color: #fff;
+}
+
+a.socialaccount-provider:hover .socialaccount-provider__icon {
+    background: #fff;
+}
