@@ -1,5 +1,6 @@
 import os
 import re
+import textwrap
 
 from bs4 import BeautifulSoup
 from modelcluster.fields import ParentalKey
@@ -10,11 +11,19 @@ from wagtailcaptcha.models import WagtailCaptchaEmailForm
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.validators import RegexValidator
+from django.urls import reverse
 from django.db import models
+from django.conf import settings
 from django.db.models import Case, Count, Q, Value, When
 from django.utils.html import mark_safe
 
-from wagtail.contrib.forms.models import AbstractEmailForm, AbstractFormField
+from wagtail.admin.mail import send_mail
+from wagtail.contrib.forms.models import (
+    AbstractEmailForm,
+    AbstractFormField,
+    AbstractForm,
+)
+from wagtail.contrib.forms.views import SubmissionsListView
 from wagtail.fields import RichTextField
 from wagtail.models import Page
 from wagtail.search import index
@@ -496,10 +505,24 @@ class SubmitFormField(AbstractFormField):
     page = ParentalKey("SubmitFormPage", related_name="form_fields")
 
 
+class SubmitFormPageSubmissionsListView(SubmissionsListView):
+    """
+    Will need changes in whatever version of Wagtail changes over to filtersets for this filtering
+    """
+
+    def get_filtering(self):
+        filtering = super().get_filtering()
+        if "pk" in self.request.GET:
+            filtering["pk"] = self.request.GET.get("pk")
+        return filtering
+
+
 class SubmitFormPage(WagtailCaptchaEmailForm if has_recaptcha() else AbstractEmailForm):
     """
     Form page, inherits from WagtailCaptchaEmailForm if available, otherwise fallback to AbstractEmailForm
     """
+
+    submissions_list_view_class = SubmitFormPageSubmissionsListView
 
     def __init__(self, *args, **kwargs):
         super(SubmitFormPage, self).__init__(*args, **kwargs)
@@ -522,5 +545,41 @@ class SubmitFormPage(WagtailCaptchaEmailForm if has_recaptcha() else AbstractEma
 
     class Meta:
         verbose_name = "Form Page"
+
+    def process_form_submission(self, form):
+        # Reproduce EmailFormMixin, but passing the submission to send_mail
+        submission = AbstractForm.process_form_submission(self, form)
+        if self.to_address:
+            self.send_mail(form, submission=submission)
+        return submission
+
+    def send_mail(self, form, submission=None):
+        addresses = [x.strip() for x in self.to_address.split(",")]
+        send_mail(
+            self.subject,
+            self.render_email(form, submission=submission),
+            addresses,
+            self.from_address,
+        )
+
+    def render_email(self, form, submission=None):
+        body = super().render_email(form)
+
+        if submission:
+            path = reverse(
+                "wagtailforms:list_submissions",
+                kwargs={"page_id": submission.page_id},
+            )
+            url = self.get_site().root_url + path
+            body += textwrap.dedent(
+                """
+                <a href="{url}?{filter_query}">Submission {sub_id}</a>
+                """.format(
+                    url=url,
+                    sub_id=submission.id,
+                    filter_query="pk=" + str(submission.id),
+                )
+            )
+        return body
 
     content_panels = panels.SUBMIT_FORM_PAGE_CONTENT_PANELS
