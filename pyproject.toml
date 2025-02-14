@@ -24,11 +24,15 @@ exclude = '''
 '''
 [tool.pytest.ini_options]
 filterwarnings = [
-    "ignore:'(wagtail|taggit|debug_toolbar):django.utils.deprecation.RemovedInDjango41Warning",
-    "ignore:django.utils.translation.ugettext_lazy():django.utils.deprecation.RemovedInDjango40Warning",
+  "ignore:'(wagtail|taggit|debug_toolbar):django.utils.deprecation.RemovedInDjango41Warning",
+  "ignore:django.utils.translation.ugettext_lazy():django.utils.deprecation.RemovedInDjango40Warning",
 ]
 # Skip the occupations/search tests while we have this disabled
 addopts = ' --ignore-glob "**/test_occupations/**" --ignore-glob "**/test_search/**"'
+
+[tool.bandit]
+exclude_dirs = ["**/tests", "node_modules"]
+
 
 [tool.flake8]
 max-line-length = 88
@@ -49,9 +53,9 @@ flake8-quotes = ["+*"]
 mccabe = ["+*"]
 pycodestyle = ["+*", "-W503", "-W504", "-E203", "-E501"]
 pyflakes = [
-    "+*",
-    "-F403",
-    "-F401", # TODO re-enable this - unable to detect undefined names
+  "+*",
+  "-F403",
+  "-F401", # TODO re-enable this - unable to detect undefined names
 ]
 pylint = ["+*", "-W504"]
 
@@ -71,11 +75,11 @@ multi_line_output = 3
 known_django = "django"
 known_wagtail = "wagtail"
 sections = [
-    "FUTURE",
-    "STDLIB",
-    "THIRDPARTY",
-    "DJANGO",
-    "WAGTAIL",
-    "FIRSTPARTY",
-    "LOCALFOLDER",
+  "FUTURE",
+  "STDLIB",
+  "THIRDPARTY",
+  "DJANGO",
+  "WAGTAIL",
+  "FIRSTPARTY",
+  "LOCALFOLDER",
 ]

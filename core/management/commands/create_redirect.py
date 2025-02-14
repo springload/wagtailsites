@@ -77,7 +77,7 @@ class Command(BaseCommand):
         try:
             page = Page.objects.get(slug=page_slug, live=True)
         except Page.DoesNotExist:
-            print("Can't find live page for slug {}".format(page_slug))
+            self.stderr.write("Can't find live page for slug {}".format(page_slug))
         else:
             self.create_page_redirect(page, page_slug, old_slug)
 
@@ -98,7 +98,7 @@ class Command(BaseCommand):
         site_id, root, page_path = page.get_url_parts()
         old_path = self.get_old_path(page_path, page_slug, old_slug)
         if old_path == page_path:
-            print(
+            self.stderr.write(
                 "Error: old path {!r} has to be different to current path {!r}. "
                 "Skipping redirect creation".format(old_path, page_path)
             )
@@ -108,7 +108,7 @@ class Command(BaseCommand):
                 Redirect.objects.get(old_path=old_path, site_id=site_id)
             except Redirect.DoesNotExist:
                 if self.dry_run:
-                    print(
+                    self.stdout.write(
                         "Redirect for {!r} path needs to be created.".format(old_path)
                     )
                 else:
@@ -118,9 +118,11 @@ class Command(BaseCommand):
                         is_permanent=self.permanent,
                         redirect_page=page,
                     )
-                    print("Redirect for {!r} path created.".format(old_path))
+                    self.stdout.write(
+                        "Redirect for {!r} path created.".format(old_path)
+                    )
             else:
-                print(
+                self.stdout.write(
                     "Redirect for {!r} path exists already. Skipping".format(old_path)
                 )
 

@@ -12,7 +12,7 @@ click==8.1.7
 colorama==0.4.6
 decorator==5.1.1
 dj-database-url==0.5.0
-Django==3.2.13
+Django==3.2.16
 django-amazon-ses==2.1.1
 django-cache-url==2.0.0
 django-debug-toolbar==3.2.4

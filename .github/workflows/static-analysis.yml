@@ -1,0 +1,73 @@
+name: Static analysis
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.ref }}-static
+  cancel-in-progress: true
+
+jobs:
+  check-ssm:
+    container: ghcr.io/springload/python-static-analysis:latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: SSM eJSON is valid
+        run: |
+          if [ -f infra/ssm.ejson ]; then
+            python -m json.tool infra/ssm.ejson > /dev/null
+          fi
+      - name: check ssm.ejson encrypted
+        run: |
+          if [ -f infra/ssm.ejson ]; then
+            wget -O- https://github.com/Shopify/ejson/releases/download/v1.3.3/ejson_1.3.3_linux_amd64.tar.gz| tar xzv -C /usr/bin/ -f - ejson
+            cp infra/ssm.ejson infra/ssm.ejson.orig
+            ejson encrypt infra/ssm.ejson
+            diff -u infra/ssm.ejson infra/ssm.ejson.orig
+          fi
+
+  formatting:
+    container: ghcr.io/springload/python-static-analysis:latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Check python imports formatted
+        run: isort . --check-only --diff --quiet
+      - name: Python format check
+        run: black --check --diff ./
+
+  code-style:
+    container: ghcr.io/springload/python-static-analysis:latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Python code style checks
+        run: ruff check .
+
+  bandit:
+    container: ghcr.io/springload/python-static-analysis:latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Python bandit check
+        run: bandit -rc pyproject.toml ./
+
+  pip-audit:
+    container: ghcr.io/springload/python-static-analysis:latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Python dependency check
+        run: pip-audit --no-deps -r requirements/constraints.txt
+        env:
+          # Don't try to resolve the pip cache, as it often fails
+          PIP_NO_CACHE_DIR: True

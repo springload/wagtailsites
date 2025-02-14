@@ -1,0 +1,10 @@
+{
+  "_public_key": "09285c38f4443bb7d4cf9fa6aac4d2326c0b39c24b45f41b7f994ba5d9b69868",
+  "common": {
+    "GOOGLE_MAPS_API_KEY": "EJ[1:nUluQ0aFIlnLJqH8rNtjVMInq9gK2Ma0MsEit4qDUS8=:ER9JF5TpKsVdr+IzU17UqVxWJHnjUAF8:0+3vpGWUIjV9Y+qmdyWe7WTM6fYi6q+Y8/LMfC6EYrCi9Zzlhe3mclzRBv4SHgbkciyCDqoUcw==]"
+  },
+  "preview": {
+  },
+  "production": {
+  }
+}

@@ -1,0 +1,169 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - deploy/*
+  pull_request:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ap-southeast-2
+  PROJECT: madewithwagtail
+
+jobs:
+  # This job uses Skopeo to check if we already have
+  # the image with the same git commit hash in the ECR
+  # If it does, it just copies it and skips the actual build.
+  retag-images:
+    if: startsWith(github.ref, 'refs/heads/deploy/')
+    outputs:
+      skip_build: ${{ steps.retag.outputs.skip_build }}
+    container: docker:stable-git
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Retag images with Skopeo
+        id: retag
+        run: |
+          apk add skopeo
+          # we tag images with short commit which is the first 8 chars
+          # of the commit
+          SHORT_COMMIT=$(echo $GITHUB_SHA | cut -c -8)
+          ENVIRONMENT=$(basename $GITHUB_REF)
+          # even with "set -e" it won't fail
+          # as it's handled in if
+          if printf "app\nhttpd" | xargs -I{} skopeo inspect docker://${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT }}-{}:common-${SHORT_COMMIT}; then
+            # retag the image by "copying" it
+            printf "app\nhttpd" | xargs -I{} skopeo copy \
+                    docker://${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT }}-{}:common-${SHORT_COMMIT} \
+                    docker://${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT }}-{}:${ENVIRONMENT}-${SHORT_COMMIT}
+            printf "app\nhttpd" | xargs -I{} skopeo copy \
+                    docker://${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT }}-{}:common-${SHORT_COMMIT} \
+                    docker://${{ steps.login-ecr.outputs.registry }}/${{ env.PROJECT }}-{}:${ENVIRONMENT}-latest
+            echo "skip_build=true" >> $GITHUB_OUTPUT
+            echo "Skipping the next build"
+          else
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+          fi
+
+
+  # This job heavily relies on Docker layer caching to make it as fast as possible
+  # It builds the app-test stage first, and tests it,
+  # and only after that builds the rest of the stuff and pushes it to ECR
+  # in one go.
+  build-and-test:
+    # builds the image if the previous job didn't fail and didn't indicate
+    # that this one should be skipped
+    if: ${{ !failure() && (needs.retag-images.outputs.skip_build!='true')}}
+    needs: [ retag-images ]
+    container: docker:stable-git
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: v0.6.3
+          driver-opts: image=moby/buildkit:v0.11.5
+      - name: Set dynamic env vars
+        run: |
+          docker version
+          SHORT_COMMIT=$(echo $GITHUB_SHA | cut -c -8)
+          echo "VERSION=${SHORT_COMMIT}" >> $GITHUB_ENV
+          echo "DATABASE_PASSWORD=$( head -c 24 /dev/urandom | xxd -p | tr -d '\n ')" >> $GITHUB_ENV
+          echo "ENVIRONMENT=$(basename $GITHUB_REF)" >> $GITHUB_ENV
+      - name: Build test containers
+        uses: docker/bake-action@v5.11.0
+        env:
+          CACHE: type=s3,region=${{ env.AWS_REGION }},bucket=${{ secrets.REGISTRY_BUCKET_NAME }},access_key_id=${{ secrets.REGISTRY_AWS_ACCESS_KEY_ID }},secret_access_key=${{ secrets.REGISTRY_AWS_SECRET_ACCESS_KEY }}
+        with:
+          files: docker-bake.hcl
+          targets: app-test
+          load: true
+      - name: Test app
+        run: |
+          # there's some limitation on the hostname length
+          # so we'll just limit it to 12 symbols using "cut"
+          # for cache and database URLs
+          DB=$(docker run --rm \
+            -ePOSTGRES_DB=${{ env.PROJECT }}_test \
+            -ePOSTGRES_PASSWORD=$DATABASE_PASSWORD \
+            -d postgres:14-alpine | cut -c -12)
+          CACHE=$(docker run --rm -d redis:5-alpine | cut -c -12)
+
+          docker run --rm -i \
+              --link=$DB --link=$CACHE \
+              -eDATABASE_URL=postgres://postgres:$DATABASE_PASSWORD@$DB/${{ env.PROJECT }}_test \
+              -eENVIRONMENT=test \
+              -eDJANGO_SETTINGS_MODULE=madewithwagtail.settings.test \
+              -eCACHE_URL=redis://$CACHE:6379/0 \
+              -eTASK_QUEUE_URL=redis://$CACHE:6379/1 \
+              ${{ env.PROJECT }}/app-test:${{ env.VERSION }}
+
+          docker stop $DB
+          docker stop $CACHE
+      - name: Test for missing or conflicting migrations
+        run: |
+          # This should live in the static analysis, but needs a full app container
+          # Using the example env file is good enough, as makemigrations doesn't need to connect
+          docker run --rm -i \
+              --env-file=dev.env.example \
+              -eENVIRONMENT=test \
+              -eDJANGO_SETTINGS_MODULE=madewithwagtail.settings.test \
+              ${{ env.PROJECT }}/app-test:${{ env.VERSION }} \
+              ./manage.py makemigrations --check --dry-run
+
+      - name: Login to Amazon ECR
+        if: startsWith(github.ref, 'refs/heads/deploy/')
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Build all other app parts and push to ECR
+        if: startsWith(github.ref, 'refs/heads/deploy/')
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          CACHE: type=s3,region=${{ env.AWS_REGION }},bucket=${{ secrets.REGISTRY_BUCKET_NAME }},access_key_id=${{ secrets.REGISTRY_AWS_ACCESS_KEY_ID }},secret_access_key=${{ secrets.REGISTRY_AWS_SECRET_ACCESS_KEY }}
+        uses: docker/bake-action@v5.11.0
+        with:
+          files: docker-bake.hcl
+          targets: default
+          # makes it push to the registry
+          push: true
+
+  deploy:
+    needs: [ build-and-test, retag-images ]
+    if: startsWith(github.ref, 'refs/heads/deploy/') && !failure()
+    container: docker:stable-git
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Download ecs-tool
+        run: |
+          wget -O ecs-tool.tar.gz https://github.com/springload/ecs-tool/releases/download/1.9.0/ecs-tool_1.9.0_linux_amd64.tar.gz && tar -C /usr/bin -xvf ecs-tool.tar.gz ecs-tool
+      - name: Deploy app
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EJSON_PRIVATE: ${{ secrets.EJSON_PRIVATE }}
+        run: |-
+          set -eu
+          ENVIRONMENT=$(basename "${GITHUB_REF}")
+          VERSION=$(echo $GITHUB_SHA | cut -c -8)
+          echo "updating the ssm parameter with ejson configuration"
+          ecs-tool -p "" -e "${ENVIRONMENT}" ejson -f infra/ssm.ejson
+          ecs-tool -p "" -e "${ENVIRONMENT}" run --image_tag "${ENVIRONMENT}-${VERSION}" -- ./deploy.sh
+          ecs-tool -p "" -e "${ENVIRONMENT}" deploy --image_tag "${ENVIRONMENT}-${VERSION}"

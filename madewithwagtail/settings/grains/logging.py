@@ -17,10 +17,6 @@ LOGGING = {
         "simple": {"format": "%(levelname)s %(message)s"},
     },
     "handlers": {
-        "mail_admins": {
-            "level": "ERROR",
-            "class": "django.utils.log.AdminEmailHandler",
-        },
         "stdout": {
             "level": "DEBUG",
             "class": "logging.StreamHandler",
@@ -29,12 +25,12 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["mail_admins", "stdout"],
+            "handlers": ["stdout"],
             "propagate": True,
             "level": "ERROR",
         },
         "core": {
-            "handlers": ["mail_admins", "stdout"],
+            "handlers": ["stdout"],
             "propagate": True,
             "level": "ERROR",
         },
